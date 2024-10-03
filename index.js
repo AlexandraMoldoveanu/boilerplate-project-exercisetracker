@@ -40,12 +40,6 @@ app.post("/api/users/:id/exercises", async (req, res) => {
   const { id } = req.params;
   const { description, duration, date } = req.body;
 
-  if (!description || !duration) {
-    return res.status(400).json({
-      error: "description and duration are required fields",
-    });
-  }
-
   try {
     const newExercise = await addExercise(id, description, duration, date);
 
@@ -56,10 +50,10 @@ app.post("/api/users/:id/exercises", async (req, res) => {
       date: newExercise.date,
     };
 
-    res.json(response);
-  } catch (error) {
-    console.error("Error adding exercise:", error);
-    res.status(500).json({ error: "Failed to add exercise" });
+    res.status(201).json(response);
+  } catch (err) {
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message });
   }
 });
 

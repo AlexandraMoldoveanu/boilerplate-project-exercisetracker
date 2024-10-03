@@ -97,6 +97,25 @@ export async function getUserLog(userId, from, to, limit) {
 }
 
 export async function addExercise(userId, description, duration, date) {
+  if (!user) {
+    const error = new Error("User not found");
+    error.status = 404;
+    throw error;
+  }
+
+  if (description.trim() === "") {
+    const error = new Error("Description is required ");
+    error.status = 400;
+    throw error;
+  }
+
+  if (!duration || isNaN(duration) || parseInt(duration) <= 0) {
+    const error = new Error("Duration should be a positive number");
+    error.status = 400;
+    throw error;
+  }
+  const foundUser = await getUserById(userId);
+
   const id = new ObjectId().toString();
 
   const exerciseDate = date
