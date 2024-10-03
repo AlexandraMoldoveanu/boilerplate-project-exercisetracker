@@ -7,36 +7,40 @@ export async function openDb() {
   return Database.open(DB_FILE);
 }
 
-export async function createUser(username) {
-  const db = await openDb();
+const db = await openDb();
 
+process.on("SIGINT", async () => {
+  if (db) {
+    await db.close();
+    console.log("Database connection closed.");
+  }
+  process.exit(0);
+});
+
+export async function createUser(username) {
   const id = new ObjectId().toString();
   await db.run("INSERT INTO users (id, username) VALUES (?, ?)", [
     id,
     username,
   ]);
-  await db.close();
+
   return id;
 }
 
 export async function getUsers() {
-  const db = await openDb();
   const users = await db.all("SELECT * FROM users");
-  await db.close();
+
   return users;
 }
 
 export async function getUserById(id) {
-  const db = await openDb();
   const user = await db.get("SELECT * FROM users WHERE id = ? ", [id]);
   console.log(user);
-  await db.close();
+
   return user;
 }
 
 export async function getUserExercises(id, from, to, limit) {
-  const db = await openDb();
-
   let query = "SELECT * FROM exercises WHERE userId = ?";
   const params = [id];
 
@@ -56,7 +60,6 @@ export async function getUserExercises(id, from, to, limit) {
   }
 
   const userExercises = await db.all(query, params);
-  await db.close();
 
   const formattedExercises = userExercises.map((exercise) => ({
     ...exercise,
@@ -67,10 +70,9 @@ export async function getUserExercises(id, from, to, limit) {
 }
 
 export async function getUserLog(userId, from, to, limit) {
-  const db = await openDb();
   const { username, id } = await getUserById(userId);
   const exercises = await getUserExercises(userId, from, to, limit);
-  await db.close();
+
   return {
     username,
     count: exercises.length,
@@ -80,7 +82,6 @@ export async function getUserLog(userId, from, to, limit) {
 }
 
 export async function addExercise(userId, description, duration, date) {
-  const db = await openDb();
   const id = new ObjectId().toString();
 
   const exerciseDate = date
