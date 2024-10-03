@@ -29,10 +29,10 @@ app.post("/api/users", async (req, res) => {
 
   try {
     const id = await createUser(username);
-    res.json({ id, username });
+    res.status(201).json({ id, username });
   } catch (err) {
-    console.error("Error creating user:", err);
-    res.status(500).json({ error: "Failed to create user" });
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message });
   }
 });
 

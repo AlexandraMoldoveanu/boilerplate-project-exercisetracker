@@ -18,6 +18,21 @@ process.on("SIGINT", async () => {
 });
 
 export async function createUser(username) {
+  if (!username || username.trim() === "") {
+    const error = new Error("Username is required");
+    error.status = 400;
+    throw error;
+  }
+
+  const existingUser = await db.get("SELECT * FROM users WHERE username = ?", [
+    username,
+  ]);
+  if (existingUser) {
+    const error = new Error("Username already exists");
+    error.status = 409;
+    throw error;
+  }
+
   const id = new ObjectId().toString();
   await db.run("INSERT INTO users (id, username) VALUES (?, ?)", [
     id,
