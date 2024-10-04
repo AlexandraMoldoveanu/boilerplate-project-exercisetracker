@@ -62,10 +62,12 @@ app.get("/api/users/:id/logs", async (req, res) => {
   const { from, to, limit } = req.query;
   try {
     const userLog = await getUserLog(id, from, to, limit);
-    res.json(userLog);
+    res.status(201).json(userLog);
   } catch (err) {
-    console.error("Error getting the user log:", err);
-    res.status(500).json({ error: "Failed to retrieve user log" });
+    const statusCode = err.status || 500;
+    res.status(statusCode).json({ error: err.message });
+    // console.error("Error getting the user log:", err);
+    // res.status(500).json({ error: "Failed to retrieve user log" });
   }
 });
 

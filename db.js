@@ -1,5 +1,11 @@
 import { Database } from "sqlite-async";
 import { ObjectId } from "bson";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat.js";
+
+import { isNumber, isDateValid } from "./validation.js";
+
+dayjs.extend(customParseFormat);
 
 const DB_FILE = "./db.db";
 
@@ -43,19 +49,23 @@ export async function createUser(username) {
 }
 
 export async function getUsers() {
-  const users = await db.all("SELECT * FROM users");
+  const users = await db.all("SELECT * FROM users ");
 
   return users;
 }
 
 export async function getUserById(id) {
-  const user = await db.get("SELECT * FROM users WHERE id = ? ", [id]);
-  console.log(user);
+  const foundUser = await db.get("SELECT * FROM users WHERE id = ? ", [id]);
+  if (!foundUser) {
+    const error = new Error("User not found");
+    error.status = 404;
+    throw error;
+  }
 
-  return user;
+  return foundUser;
 }
 
-export async function getUserExercises(id, from, to, limit) {
+export async function getUserExercises(id, from, to) {
   let query = "SELECT * FROM exercises WHERE userId = ?";
   const params = [id];
 
@@ -69,10 +79,7 @@ export async function getUserExercises(id, from, to, limit) {
     params.push(new Date(to).toISOString().slice(0, 10));
   }
 
-  if (limit) {
-    query += " LIMIT ?";
-    params.push(parseInt(limit));
-  }
+  query += " ORDER BY date";
 
   const userExercises = await db.all(query, params);
 
@@ -85,23 +92,42 @@ export async function getUserExercises(id, from, to, limit) {
 }
 
 export async function getUserLog(userId, from, to, limit) {
-  const { username, id } = await getUserById(userId);
-  const exercises = await getUserExercises(userId, from, to, limit);
+  const foundUser = await getUserById(userId);
+
+  const { username, id } = foundUser;
+
+  if (limit && (parseInt(limit) < 0 || !isNumber(limit))) {
+    const error = new Error("Limit should be a positive number");
+    error.status = 400;
+    throw error;
+  }
+
+  if (from && !isDateValid(from)) {
+    const error = new Error(
+      "Invalid query. Please use one of the following formats: 'YYYY-MM-DD', 'MM/DD/YYYY', or 'DD-MM-YYYY'."
+    );
+    error.status = 400;
+    throw error;
+  }
+  if (to && !isDateValid(to)) {
+    const error = new Error(
+      "Invalid query. Please use one of the following formats: 'YYYY-MM-DD', 'MM/DD/YYYY', or 'DD-MM-YYYY'."
+    );
+    error.status = 400;
+    throw error;
+  }
+  const exercises = await getUserExercises(userId, from, to);
 
   return {
     username,
     count: exercises.length,
     id,
-    log: exercises,
+    log: limit ? exercises.slice(0, parseInt(limit)) : exercises,
   };
 }
 
 export async function addExercise(userId, description, duration, date) {
-  if (!user) {
-    const error = new Error("User not found");
-    error.status = 404;
-    throw error;
-  }
+  await getUserById(userId);
 
   if (description.trim() === "") {
     const error = new Error("Description is required ");
@@ -109,24 +135,31 @@ export async function addExercise(userId, description, duration, date) {
     throw error;
   }
 
-  if (!duration || isNaN(duration) || parseInt(duration) <= 0) {
+  if (!isNumber(duration) || parseInt(duration) <= 0) {
     const error = new Error("Duration should be a positive number");
     error.status = 400;
     throw error;
   }
-  const foundUser = await getUserById(userId);
+
+  let exerciseDate;
+  if (date) {
+    if (!isDateValid(date)) {
+      const error = new Error(
+        "Invalid date. Please use one of the following formats: 'YYYY-MM-DD', 'MM/DD/YYYY', or 'DD-MM-YYYY'."
+      );
+      error.status = 400;
+      throw error;
+    }
+    exerciseDate = dayjs(date).format("YYYY-MM-DD");
+  } else {
+    exerciseDate = dayjs().format("YYYY-MM-DD");
+  }
 
   const id = new ObjectId().toString();
-
-  const exerciseDate = date
-    ? new Date(date).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
   await db.run(
     "INSERT INTO exercises (id, userId, description, duration, date) VALUES (?, ?, ?, ?, ?)",
     [id, userId, description, parseInt(duration), exerciseDate]
   );
-
-  const formattedDate = new Date(exerciseDate).toDateString();
-
+  const formattedDate = dayjs(exerciseDate).format("ddd MMM DD YYYY");
   return { description, duration: parseInt(duration), date: formattedDate };
 }
